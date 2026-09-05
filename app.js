@@ -1,85 +1,76 @@
 // ===============================
-// ① Three.js 基本セットアップ
+// XR8 の Three.js シーンを取得
 // ===============================
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(
-  60,
-  window.innerWidth / window.innerHeight,
-  0.01,
-  1000
-);
+let xrScene = null;
 
-const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-document.getElementById('xrweb').appendChild(renderer.domElement);
-
-// ===============================
-// ② ライト
-// ===============================
-const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-dirLight.position.set(1, 2, 3);
-scene.add(dirLight);
-
-const ambLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambLight);
-
-// ===============================
-// ③ GLB 読み込み（AR_prd.glb）
-// ===============================
-let model;
-const loader = new THREE.GLTFLoader();
-
-loader.load('assets/AR_prd.glb', (gltf) => {
-  model = gltf.scene;
-
-  // Niantic Studio の Inspector と合わせる
-  model.position.set(0, 0, 0);
-  model.scale.set(3, 3, 3);
-
-  scene.add(model);
-
-  // ローディング非表示
-  hideOnReady();
-
-  // タップで配置できるようにする
-  setupTapToPlace();
-
-  // リセットボタンを有効化
-  setupResetButton();
-});
-
-// ===============================
-// ④ XR8 パイプライン
-// ===============================
 XR8.addCameraPipelineModules([
   XR8.GlTextureRenderer.pipelineModule(),
   XR8.Threejs.pipelineModule(),
+  {
+    name: 'xr-init',
+    onStart: () => {
+      xrScene = XR8.Threejs.xrScene();   // XR8 の renderer / scene / camera を取得
+      startApp();                        // Three.js ロジック開始
+    }
+  }
 ]);
 
 // ===============================
-// ⑤ 距離スケール（近づくと大きく）
+// Three.js ロジック本体
 // ===============================
-XR8.addCameraPipelineModule({
-  name: 'scale-by-distance',
-  onUpdate: ({ camera }) => {
-    if (!model) return;
+function startApp() {
+  const scene = xrScene.scene;
+  const camera = xrScene.camera;
+  const renderer = xrScene.renderer;
 
-    const distance = camera.position.distanceTo(model.position);
-    const scale = Math.max(0.5, 3.0 / distance);
-    model.scale.set(scale, scale, scale);
-  },
-});
+  // ライト
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+  dirLight.position.set(1, 2, 3);
+  scene.add(dirLight);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+  // GLB 読み込み
+  let model;
+  const loader = new THREE.GLTFLoader();
+  loader.load('assets/AR_prd.glb', (gltf) => {
+    model = gltf.scene;
+    model.position.set(0, 0, 0);
+    model.scale.set(3, 3, 3);
+    scene.add(model);
+
+    hideOnReady();
+    setupTapToPlace(model, camera, scene);
+    setupResetButton(model);
+  });
+
+  // 距離スケール
+  XR8.addCameraPipelineModule({
+    name: 'scale-by-distance',
+    onUpdate: ({ camera }) => {
+      if (!model) return;
+      const distance = camera.position.distanceTo(model.position);
+      const scale = Math.max(0.5, 3.0 / distance);
+      model.scale.set(scale, scale, scale);
+    }
+  });
+
+  // 描画ループ（XR8 の renderer を使う）
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+  animate();
+}
 
 // ===============================
-// ⑥ タップでモデルを配置する処理
+// タップ配置
 // ===============================
-function setupTapToPlace() {
+function setupTapToPlace(model, camera, scene) {
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2();
 
   window.addEventListener('click', (event) => {
-    if (!model) return;
-
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -87,51 +78,36 @@ function setupTapToPlace() {
     const intersects = raycaster.intersectObjects(scene.children, true);
 
     if (intersects.length > 0) {
-      const point = intersects[0].point;
-      model.position.copy(point);
+      model.position.copy(intersects[0].point);
     }
   });
 }
 
 // ===============================
-// ⑦ リセットボタン（元の位置・スケールに戻す）
+// リセットボタン
 // ===============================
-function setupResetButton() {
-  if (!model) return;
-
+function setupResetButton(model) {
   const button = document.createElement('button');
   button.innerText = 'リセット';
   button.style.position = 'absolute';
   button.style.bottom = '20px';
   button.style.left = '20px';
-  button.style.padding = '8px 16px';
-  button.style.fontSize = '16px';
   button.style.zIndex = '10';
   document.body.appendChild(button);
 
-  const initialPosition = model.position.clone();
+  const initialPos = model.position.clone();
   const initialScale = model.scale.clone();
 
   button.addEventListener('click', () => {
-    model.position.copy(initialPosition);
+    model.position.copy(initialPos);
     model.scale.copy(initialScale);
   });
 }
 
 // ===============================
-// ⑧ ローディング非表示
+// ローディング非表示
 // ===============================
 function hideOnReady() {
   const loading = document.getElementById('loading');
-  if (!loading) return;
-  loading.style.display = 'none';
+  if (loading) loading.style.display = 'none';
 }
-
-// ===============================
-// ⑨ 描画ループ
-// ===============================
-function animate() {
-  requestAnimationFrame(animate);
-  renderer.render(scene, camera);
-}
-animate();
