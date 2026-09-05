@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>WebAR World Effects</title>
+
+  <!-- 8th Wall OSS版エンジン -->
+  <script src="https://cdn.jsdelivr.net/npm/@8thwall/web@latest/dist/xrweb.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@8thwall/web@latest/dist/xrextras.js"></script>
+
+  <!-- Three.js と GLTFLoader -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.150.1/examples/js/loaders/GLTFLoader.js"></script>
+</head>
+
+<body>
+  <!-- カメラ映像と3Dシーンを描画するコンテナ -->
+  <div id="xrweb"></div>
+
+  <!-- ローディング表示（hide-on-ready.ts が消す） -->
+  <div id="loading" style="
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: white;
+    font-size: 20px;
+  ">
+    読み込み中...
+  </div>
+
+  <!-- app.js を ES Module として読み込む -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
